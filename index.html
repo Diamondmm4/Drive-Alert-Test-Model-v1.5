@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drowsiness Prototype</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --bg: #111;
+    --fg: #fff;
+    --card-bg: #1c1c1c;
+    --muted: #999;
+    --accent: #2ecc71;
+    --danger: #c0392b;
+    --btn-fg: #111;
+  }
+  [data-theme="light"] {
+    --bg: #f4f4f4;
+    --fg: #111;
+    --card-bg: #ffffff;
+    --muted: #666;
+    --accent: #27ae60;
+    --danger: #c0392b;
+    --btn-fg: #fff;
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    transition: background 0.2s, color 0.2s;
+  }
+  .screen {
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    position: relative;
+  }
+  .screen.active { display: flex; }
+
+  /* ---- Main / home screen ---- */
+  #screenMain { justify-content: center; }
+  .themeToggle {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: var(--card-bg);
+    border: 1px solid #444;
+    color: var(--fg);
+    font-size: 20px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .mainTitle {
+    font-size: 28px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .mainButtons {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+  }
+  .bigBtn {
+    background: var(--accent);
+    color: var(--btn-fg);
+    border: none;
+    padding: 22px;
+    font-size: 19px;
+    font-weight: bold;
+    border-radius: 14px;
+    width: 100%;
+  }
+  .bigBtn.secondary {
+    background: var(--card-bg);
+    color: var(--fg);
+    border: 1px solid #555;
+  }
+
+  /* ---- Back button (shared) ---- */
+  .backBtn {
+    align-self: flex-start;
+    background: none;
+    border: none;
+    color: var(--fg);
+    font-size: 17px;
+    padding: 8px 0;
+    margin-bottom: 12px;
+    width: auto;
+  }
+
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  h2 { margin-bottom: 8px; font-size: 20px; }
+  p.instructions {
+    color: var(--fg);
+    opacity: 0.85;
+    font-size: 17px;
+    line-height: 1.6;
+    margin: 16px 0;
+    background: var(--card-bg);
+    padding: 16px;
+    border-radius: 10px;
+  }
+  video, canvas {
+    width: 100%;
+    max-width: 480px;
+    border-radius: 8px;
+  }
+  #videoWrap {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    margin: 12px 0;
+  }
+  canvas { position: absolute; top: 0; left: 0; }
+  .timer { font-size: 44px; font-weight: bold; margin: 8px 0; }
+  .progressBarWrap {
+    width: 100%;
+    height: 12px;
+    background: #333;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .progressBarFill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.1s linear;
+  }
+  .liveHint { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  button.stdBtn {
+    background: var(--accent);
+    color: var(--btn-fg);
+    border: none;
+    padding: 16px 36px;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 10px;
+    margin-top: 16px;
+    width: 100%;
+  }
+  button.stdBtn:disabled { background: #444; color: #888; }
+  .badge {
+    display: inline-block;
+    background: var(--accent);
+    color: var(--btn-fg);
+    font-size: 13px;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 999px;
+    margin-bottom: 12px;
+  }
+  #status { color: var(--muted); font-size: 12px; margin-top: 12px; text-align: center; }
+
+  /* ---- Tracking screen redesign ---- */
+  #screenTracking { padding: 16px; }
+  .trackingTopBar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 12px;
+  }
+  .smallLinkBtn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 14px;
+    text-decoration: underline;
+  }
+  .monitorSquare {
+    width: 100%;
+    aspect-ratio: 1 / 0.75;
+    background: var(--card-bg);
+    border-radius: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    transition: background 0.2s;
+  }
+  .monitorSquare.alarm { background: var(--danger); }
+  .monitorText {
+    font-size: 30px;
+    font-weight: bold;
+    color: var(--fg);
+  }
+  .monitorSquare.alarm .monitorText { color: #fff; }
+  .recDot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--danger);
+    animation: pulse 1.2s infinite;
+  }
+  .monitorSquare.alarm .recDot { background: #fff; animation: none; }
+  @keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.3; }
+    100% { opacity: 1; }
+  }
+  .statsArea {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    margin-top: 16px;
+  }
+  .statRow {
+    background: var(--card-bg);
+    border-radius: 14px;
+    padding: 18px;
+    font-size: 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .statRow .label { color: var(--muted); }
+  .statRow .value { font-weight: bold; font-size: 20px; }
+
+  /* ---- Logs screens ---- */
+  .sessionCard {
+    width: 100%;
+    background: var(--card-bg);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+    text-align: left;
+  }
+  .sessionCard .sessionTitle { font-weight: bold; font-size: 17px; }
+  .sessionCard .sessionMeta { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .warningRow {
+    width: 100%;
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+    text-align: left;
+    font-size: 16px;
+  }
+  .warningRow .warnType { font-weight: bold; }
+  .warningRow .warnTime { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .emptyMessage {
+    margin: auto;
+    color: var(--muted);
+    font-size: 16px;
+    text-align: center;
+  }
+  .listWrap {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+</style>
+</head>
+<body>
+
+<!-- SCREEN: Main / Home -->
+<div id="screenMain" class="screen active">
+  <button class="themeToggle" id="themeToggleBtn">&#9789;</button>
+  <div class="mainTitle">Welcome, Driver</div>
+  <div class="mainButtons">
+    <button class="bigBtn" id="startDriveBtn">Start Drive</button>
+    <button class="bigBtn secondary" id="driveLogsBtn">Drive Logs</button>
+  </div>
+</div>
+
+<!-- SCREEN 1: Instructions before eye calibration -->
+<div id="screenPlaceEyes" class="screen">
+  <button class="backBtn" id="backFromPlaceEyes">&larr; Back</button>
+  <span class="badge">Step 1 of 4</span>
+  <h1>Where to Put Your Phone</h1>
+  <p class="instructions">Hold your phone the way you'll be looking at it — like checking a screen normally. Make sure your face is clearly visible and well-lit. When you're ready, tap Start and just look at the camera normally for a few seconds.</p>
+  <button class="stdBtn" id="placeEyesNextBtn">Start Eye Calibration</button>
+</div>
+
+<!-- SCREEN 2: Eye calibration (active tracking) -->
+<div id="screenEyes" class="screen">
+  <span class="badge">Step 2 of 4</span>
+  <h2>Calibrating Your Eyes</h2>
+  <p class="instructions">Keep looking at the camera normally. Don't force your eyes wide open — just look naturally.</p>
+  <div id="videoWrapEyes" class="videoWrapHolder"></div>
+  <div class="progressBarWrap"><div class="progressBarFill" id="eyesProgressFill"></div></div>
+  <div class="timer"><span id="eyesTimer">0.0</span>s</div>
+  <div class="liveHint">Live Eye Stretch reading: <span id="liveEar">--</span></div>
+  <button class="stdBtn" id="eyesNextBtn" disabled>Next</button>
+</div>
+
+<!-- SCREEN 3: Instructions before head calibration -->
+<div id="screenPlaceHead" class="screen">
+  <span class="badge">Step 3 of 4</span>
+  <h1>Now Mount Your Phone</h1>
+  <p class="instructions">Place your phone exactly where it'll sit while you drive — on your dash or mount. Then sit like you normally would and look straight ahead at the road, not at the phone. This teaches the app what "eyes on the road" looks like for your specific setup.</p>
+  <button class="stdBtn" id="placeHeadNextBtn">Start Head Calibration</button>
+</div>
+
+<!-- SCREEN 4: Head pose calibration (active tracking) -->
+<div id="screenHead" class="screen">
+  <span class="badge">Step 4 of 4</span>
+  <h2>Calibrating Head Position</h2>
+  <p class="instructions">Keep looking straight ahead like you're watching the road.</p>
+  <div id="videoWrapHead" class="videoWrapHolder"></div>
+  <div class="progressBarWrap"><div class="progressBarFill" id="headProgressFill"></div></div>
+  <div class="timer"><span id="headTimer">0.0</span>s</div>
+  <div class="liveHint">Live horizontal: <span id="liveYaw">--</span>&deg; | Live vertical: <span id="livePitch">--</span>&deg;</div>
+  <button class="stdBtn" id="headNextBtn" disabled>Start Monitoring</button>
+</div>
+
+<!-- SCREEN 5: Active tracking (redesigned) -->
+<div id="screenTracking" class="screen">
+  <div class="trackingTopBar">
+    <button class="smallLinkBtn" id="recalibrateBtn">Recalibrate</button>
+    <button class="smallLinkBtn" id="endDriveBtn">End Drive</button>
+  </div>
+
+  <div class="monitorSquare" id="monitorSquare">
+    <div class="monitorText" id="monitorText">Monitoring</div>
+    <div class="recDot" id="recDot"></div>
+  </div>
+
+  <div class="statsArea">
+    <div class="statRow"><span class="label">Horizontal Head Position:</span> <span class="value"><span id="yaw">--</span>&deg;</span></div>
+    <div class="statRow"><span class="label">Vertical Head Position:</span> <span class="value"><span id="pitch">--</span>&deg;</span></div>
+    <div class="statRow"><span class="label">Eye Stretch:</span> <span class="value"><span id="earVal">--</span></span></div>
+  </div>
+
+  <div id="videoWrapTracking" class="videoWrapHolder" style="display:none;"></div>
+</div>
+
+<!-- SCREEN: Drive Logs (session list) -->
+<div id="screenLogs" class="screen">
+  <button class="backBtn" id="backFromLogs">&larr; Back</button>
+  <h1>Drive Logs</h1>
+  <div class="listWrap" id="sessionListWrap">
+    <!-- session cards injected here -->
+  </div>
+</div>
+
+<!-- SCREEN: Session Detail -->
+<div id="screenSessionDetail" class="screen">
+  <button class="backBtn" id="backFromSessionDetail">&larr; Back</button>
+  <h1 id="sessionDetailTitle">Drive Session</h1>
+  <div class="listWrap" id="sessionDetailWrap">
+    <!-- warning rows or empty message injected here -->
+  </div>
+</div>
+
+<div id="status">Loading model...</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
+<script>
+// ============ Landmarks & thresholds ============
+const LEFT_EYE = { top: 159, bottom: 145, left: 33, right: 133 };
+const RIGHT_EYE = { top: 386, bottom: 374, left: 362, right: 263 };
+const NOSE_TIP = 1;
+const LEFT_FACE = 234;
+const RIGHT_FACE = 454;
+const FOREHEAD = 10;
+const CHIN = 152;
+
+const EYE_CLOSED_THRESHOLD = 3.0;
+const PITCH_TURNED_THRESHOLD = 3.0;
+const YAW_TURNED_THRESHOLD = 4.0;
+const EAR_CLOSED_RATIO = 0.7;
+const YAW_LOWER_OFFSET_DEG = -100;
+const YAW_UPPER_OFFSET_DEG = 25;
+const PITCH_DEVIATION_THRESHOLD_DEG = 15;
+
+const EYE_CALIBRATION_SECONDS = 4;
+const HEAD_CALIBRATION_SECONDS = 4;
+
+// ============ State ============
+let baselineEAR = null;
+let eyeCalibrationSamples = [];
+let eyeCalibrationStartTime = null;
+let eyeCalibrationDone = false;
+
+let baselineYaw = null;
+let baselinePitch = null;
+let headCalibrationSamples = [];
+let headCalibrationStartTime = null;
+let headCalibrationDone = false;
+
+let appState = 'main'; // main -> placeEyes -> eyes -> placeHead -> head -> tracking; also logs, sessionDetail
+let recalibrating = false; // true if recalibrate was triggered mid-session (skip creating a new session)
+
+let eyesClosedStart = null;
+let pitchTurnedStart = null;
+let yawTurnedStart = null;
+let alarmPlaying = false;
+
+let currentSession = null; // { id, startTime, warnings: [{type, timestamp}] }
+let sessions = [];
+const SESSIONS_KEY = 'drowsiness_sessions_v1';
+const THEME_KEY = 'drowsiness_theme_v1';
+
+function loadSessions() {
+  try {
+    const raw = localStorage.getItem(SESSIONS_KEY);
+    sessions = raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    sessions = [];
+  }
+}
+function saveSessions() {
+  try {
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+  } catch (e) { /* storage unavailable, ignore for prototype */ }
+}
+loadSessions();
+
+// ============ Theme ============
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  themeToggleBtn.innerHTML = theme === 'light' ? '&#9788;' : '&#9789;';
+}
+let currentTheme = localStorage.getItem(THEME_KEY) || 'dark';
+
+// ============ DOM refs ============
+const videoEl = document.createElement('video');
+videoEl.id = 'video';
+videoEl.setAttribute('playsinline', '');
+videoEl.setAttribute('autoplay', '');
+videoEl.muted = true;
+const canvasEl = document.createElement('canvas');
+canvasEl.id = 'canvas';
+const videoWrap = document.createElement('div');
+videoWrap.id = 'videoWrap';
+videoWrap.appendChild(videoEl);
+videoWrap.appendChild(canvasEl);
+const ctx = canvasEl.getContext('2d');
+
+const screenMain = document.getElementById('screenMain');
+const screenPlaceEyes = document.getElementById('screenPlaceEyes');
+const screenEyes = document.getElementById('screenEyes');
+const screenPlaceHead = document.getElementById('screenPlaceHead');
+const screenHead = document.getElementById('screenHead');
+const screenTracking = document.getElementById('screenTracking');
+const screenLogs = document.getElementById('screenLogs');
+const screenSessionDetail = document.getElementById('screenSessionDetail');
+
+const themeToggleBtn = document.getElementById('themeToggleBtn');
+const startDriveBtn = document.getElementById('startDriveBtn');
+const driveLogsBtn = document.getElementById('driveLogsBtn');
+
+const backFromPlaceEyes = document.getElementById('backFromPlaceEyes');
+const placeEyesNextBtn = document.getElementById('placeEyesNextBtn');
+const placeHeadNextBtn = document.getElementById('placeHeadNextBtn');
+
+const eyesProgressFill = document.getElementById('eyesProgressFill');
+const eyesTimer = document.getElementById('eyesTimer');
+const eyesNextBtn = document.getElementById('eyesNextBtn');
+const liveEar = document.getElementById('liveEar');
+
+const headProgressFill = document.getElementById('headProgressFill');
+const headTimer = document.getElementById('headTimer');
+const headNextBtn = document.getElementById('headNextBtn');
+const liveYaw = document.getElementById('liveYaw');
+const livePitch = document.getElementById('livePitch');
+
+const yawEl = document.getElementById('yaw');
+const pitchEl = document.getElementById('pitch');
+const earValEl = document.getElementById('earVal');
+const monitorSquare = document.getElementById('monitorSquare');
+const monitorText = document.getElementById('monitorText');
+const recalibrateBtn = document.getElementById('recalibrateBtn');
+const endDriveBtn = document.getElementById('endDriveBtn');
+
+const backFromLogs = document.getElementById('backFromLogs');
+const backFromSessionDetail = document.getElementById('backFromSessionDetail');
+const sessionListWrap = document.getElementById('sessionListWrap');
+const sessionDetailWrap = document.getElementById('sessionDetailWrap');
+const sessionDetailTitle = document.getElementById('sessionDetailTitle');
+
+const statusEl = document.getElementById('status');
+
+// ============ Screen switching ============
+function showScreen(name) {
+  screenMain.classList.toggle('active', name === 'main');
+  screenPlaceEyes.classList.toggle('active', name === 'placeEyes');
+  screenEyes.classList.toggle('active', name === 'eyes');
+  screenPlaceHead.classList.toggle('active', name === 'placeHead');
+  screenHead.classList.toggle('active', name === 'head');
+  screenTracking.classList.toggle('active', name === 'tracking');
+  screenLogs.classList.toggle('active', name === 'logs');
+  screenSessionDetail.classList.toggle('active', name === 'sessionDetail');
+
+  if (name === 'eyes') {
+    document.getElementById('videoWrapEyes').appendChild(videoWrap);
+  } else if (name === 'head') {
+    document.getElementById('videoWrapHead').appendChild(videoWrap);
+  } else if (name === 'tracking') {
+    document.getElementById('videoWrapTracking').appendChild(videoWrap);
+  }
+}
+
+// ============ Math helpers ============
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+function calcEAR(landmarks, eye) {
+  const top = landmarks[eye.top];
+  const bottom = landmarks[eye.bottom];
+  const left = landmarks[eye.left];
+  const right = landmarks[eye.right];
+  const vertical = dist(top, bottom);
+  const horizontal = dist(left, right);
+  if (horizontal === 0) return 0;
+  return vertical / horizontal;
+}
+
+function calcHeadPose(landmarks) {
+  const nose = landmarks[NOSE_TIP];
+  const leftFace = landmarks[LEFT_FACE];
+  const rightFace = landmarks[RIGHT_FACE];
+  const forehead = landmarks[FOREHEAD];
+  const chin = landmarks[CHIN];
+  const faceWidth = dist(leftFace, rightFace);
+  const midX = (leftFace.x + rightFace.x) / 2;
+  const yawDeg = ((nose.x - midX) / (faceWidth || 1)) * 90;
+  const faceHeight = dist(forehead, chin);
+  const midY = (forehead.y + chin.y) / 2;
+  const pitchDeg = ((nose.y - midY) / (faceHeight || 1)) * 90;
+  return { yaw: yawDeg, pitch: pitchDeg };
+}
+
+// ============ Alarm ============
+// ============ Alarm sound (generated with Web Audio API, no external file needed) ============
+let audioCtx = null;
+let sirenOscillator = null;
+let sirenGain = null;
+let sirenIntervalId = null;
+
+function ensureAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function startAlarmSound() {
+  ensureAudioContext();
+  if (sirenOscillator) return; // already playing
+
+  sirenOscillator = audioCtx.createOscillator();
+  sirenGain = audioCtx.createGain();
+  sirenOscillator.type = 'square';
+  sirenGain.gain.value = 0.35; // loud but not clipping
+  sirenOscillator.connect(sirenGain);
+  sirenGain.connect(audioCtx.destination);
+  sirenOscillator.start();
+
+  // Alternate between two frequencies to create an urgent two-tone siren
+  const freqLow = 700;
+  const freqHigh = 1000;
+  let high = false;
+  sirenOscillator.frequency.setValueAtTime(freqLow, audioCtx.currentTime);
+  sirenIntervalId = setInterval(() => {
+    high = !high;
+    sirenOscillator.frequency.setValueAtTime(high ? freqHigh : freqLow, audioCtx.currentTime);
+  }, 300);
+}
+
+function stopAlarmSound() {
+  if (sirenIntervalId) {
+    clearInterval(sirenIntervalId);
+    sirenIntervalId = null;
+  }
+  if (sirenOscillator) {
+    sirenOscillator.stop();
+    sirenOscillator.disconnect();
+    sirenOscillator = null;
+  }
+  if (sirenGain) {
+    sirenGain.disconnect();
+    sirenGain = null;
+  }
+}
+
+function setAlarm(on) {
+  if (on && !alarmPlaying) {
+    alarmPlaying = true;
+    monitorSquare.classList.add('alarm');
+    monitorText.textContent = 'Look at the road!';
+    startAlarmSound();
+  } else if (!on && alarmPlaying) {
+    alarmPlaying = false;
+    monitorSquare.classList.remove('alarm');
+    monitorText.textContent = 'Monitoring';
+    stopAlarmSound();
+  }
+}
+
+function logWarning(type) {
+  if (!currentSession) return;
+  currentSession.warnings.push({ type, timestamp: Date.now() });
+  saveSessions();
+}
+
+// ============ Calibration reset (used both for fresh start and recalibrate) ============
+function resetCalibrationState() {
+  baselineEAR = null;
+  eyeCalibrationSamples = [];
+  eyeCalibrationStartTime = null;
+  eyeCalibrationDone = false;
+  baselineYaw = null;
+  baselinePitch = null;
+  headCalibrationSamples = [];
+  headCalibrationStartTime = null;
+  headCalibrationDone = false;
+  eyesNextBtn.disabled = true;
+  headNextBtn.disabled = true;
+  eyesProgressFill.style.width = '0%';
+  headProgressFill.style.width = '0%';
+  eyesClosedStart = null;
+  pitchTurnedStart = null;
+  yawTurnedStart = null;
+  setAlarm(false);
+}
+
+// ============ Navigation handlers ============
+themeToggleBtn.addEventListener('click', () => {
+  currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, currentTheme);
+  applyTheme(currentTheme);
+});
+
+startDriveBtn.addEventListener('click', () => {
+  ensureAudioContext(); // must happen on a direct user tap for iOS to allow audio later
+  recalibrating = false;
+  resetCalibrationState();
+  appState = 'placeEyes';
+  showScreen('placeEyes');
+});
+
+driveLogsBtn.addEventListener('click', () => {
+  renderSessionList();
+  appState = 'logs';
+  showScreen('logs');
+});
+
+backFromPlaceEyes.addEventListener('click', () => {
+  appState = 'main';
+  showScreen('main');
+});
+
+placeEyesNextBtn.addEventListener('click', () => {
+  appState = 'eyes';
+  showScreen('eyes');
+});
+
+eyesNextBtn.addEventListener('click', () => {
+  appState = 'placeHead';
+  showScreen('placeHead');
+});
+
+placeHeadNextBtn.addEventListener('click', () => {
+  appState = 'head';
+  showScreen('head');
+});
+
+headNextBtn.addEventListener('click', () => {
+  if (!recalibrating) {
+    // Starting a brand new drive session
+    currentSession = {
+      id: Date.now().toString(),
+      startTime: Date.now(),
+      warnings: []
+    };
+    sessions.push(currentSession);
+    saveSessions();
+  }
+  recalibrating = false;
+  appState = 'tracking';
+  showScreen('tracking');
+});
+
+recalibrateBtn.addEventListener('click', () => {
+  recalibrating = true;
+  resetCalibrationState();
+  appState = 'placeEyes';
+  showScreen('placeEyes');
+});
+
+endDriveBtn.addEventListener('click', () => {
+  setAlarm(false);
+  currentSession = null;
+  appState = 'main';
+  showScreen('main');
+});
+
+backFromLogs.addEventListener('click', () => {
+  appState = 'main';
+  showScreen('main');
+});
+
+backFromSessionDetail.addEventListener('click', () => {
+  renderSessionList();
+  appState = 'logs';
+  showScreen('logs');
+});
+
+// ============ Logs rendering ============
+function formatDateTime(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' \u2022 ' +
+         d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+function renderSessionList() {
+  sessionListWrap.innerHTML = '';
+  if (sessions.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'emptyMessage';
+    empty.textContent = 'No drive sessions yet.';
+    sessionListWrap.appendChild(empty);
+    return;
+  }
+  // Most recent first
+  const sorted = [...sessions].sort((a, b) => b.startTime - a.startTime);
+  sorted.forEach((session) => {
+    const card = document.createElement('div');
+    card.className = 'sessionCard';
+    const title = document.createElement('div');
+    title.className = 'sessionTitle';
+    title.textContent = formatDateTime(session.startTime);
+    const meta = document.createElement('div');
+    meta.className = 'sessionMeta';
+    meta.textContent = session.warnings.length === 0
+      ? 'No warnings'
+      : `${session.warnings.length} warning${session.warnings.length === 1 ? '' : 's'}`;
+    card.appendChild(title);
+    card.appendChild(meta);
+    card.addEventListener('click', () => openSessionDetail(session.id));
+    sessionListWrap.appendChild(card);
+  });
+}
+
+function openSessionDetail(sessionId) {
+  const session = sessions.find((s) => s.id === sessionId);
+  if (!session) return;
+  sessionDetailTitle.textContent = formatDateTime(session.startTime);
+  sessionDetailWrap.innerHTML = '';
+  if (session.warnings.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'emptyMessage';
+    empty.textContent = 'No warnings were given during this drive.';
+    sessionDetailWrap.appendChild(empty);
+  } else {
+    session.warnings.forEach((w) => {
+      const row = document.createElement('div');
+      row.className = 'warningRow';
+      const type = document.createElement('div');
+      type.className = 'warnType';
+      type.textContent = w.type === 'drowsy' ? 'Drowsiness Warning' : 'Distraction Warning';
+      const time = document.createElement('div');
+      time.className = 'warnTime';
+      time.textContent = new Date(w.timestamp).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+      row.appendChild(type);
+      row.appendChild(time);
+      sessionDetailWrap.appendChild(row);
+    });
+  }
+  appState = 'sessionDetail';
+  showScreen('sessionDetail');
+}
+
+// ============ Main detection loop ============
+function onResults(results) {
+  canvasEl.width = videoEl.videoWidth;
+  canvasEl.height = videoEl.videoHeight;
+  ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+  if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+    if (appState !== 'placeEyes' && appState !== 'placeHead' && appState !== 'main' && appState !== 'logs' && appState !== 'sessionDetail') {
+      statusEl.textContent = 'No face detected — reposition camera';
+    }
+    return;
+  }
+
+  const landmarks = results.multiFaceLandmarks[0];
+  const leftEAR = calcEAR(landmarks, LEFT_EYE);
+  const rightEAR = calcEAR(landmarks, RIGHT_EYE);
+  const avgEAR = (leftEAR + rightEAR) / 2;
+  const { yaw, pitch } = calcHeadPose(landmarks);
+  const now = performance.now();
+
+  if (appState === 'placeEyes' || appState === 'placeHead') {
+    statusEl.textContent = 'Face detected. Tap the button when ready.';
+    return;
+  }
+
+  if (appState === 'eyes') {
+    if (eyeCalibrationStartTime === null) eyeCalibrationStartTime = now;
+    eyeCalibrationSamples.push(avgEAR);
+    liveEar.textContent = avgEAR.toFixed(3);
+    const elapsed = (now - eyeCalibrationStartTime) / 1000;
+    const pct = Math.min(elapsed / EYE_CALIBRATION_SECONDS, 1);
+    eyesTimer.textContent = elapsed.toFixed(1);
+    eyesProgressFill.style.width = (pct * 100).toFixed(0) + '%';
+    statusEl.textContent = 'Calibrating eyes...';
+    if (elapsed >= EYE_CALIBRATION_SECONDS && !eyeCalibrationDone) {
+      eyeCalibrationDone = true;
+      baselineEAR = eyeCalibrationSamples.reduce((a, b) => a + b, 0) / eyeCalibrationSamples.length;
+      eyesNextBtn.disabled = false;
+      statusEl.textContent = `Done. Baseline: ${baselineEAR.toFixed(3)}. Tap Next.`;
+    }
+    return;
+  }
+
+  if (appState === 'head') {
+    if (headCalibrationStartTime === null) headCalibrationStartTime = now;
+    headCalibrationSamples.push({ yaw, pitch });
+    liveYaw.textContent = yaw.toFixed(1);
+    livePitch.textContent = pitch.toFixed(1);
+    const elapsed = (now - headCalibrationStartTime) / 1000;
+    const pct = Math.min(elapsed / HEAD_CALIBRATION_SECONDS, 1);
+    headTimer.textContent = elapsed.toFixed(1);
+    headProgressFill.style.width = (pct * 100).toFixed(0) + '%';
+    statusEl.textContent = 'Calibrating head position...';
+    if (elapsed >= HEAD_CALIBRATION_SECONDS && !headCalibrationDone) {
+      headCalibrationDone = true;
+      baselineYaw = headCalibrationSamples.reduce((a, b) => a + b.yaw, 0) / headCalibrationSamples.length;
+      baselinePitch = headCalibrationSamples.reduce((a, b) => a + b.pitch, 0) / headCalibrationSamples.length;
+      headNextBtn.disabled = false;
+      statusEl.textContent = `Done. Tap Start Monitoring.`;
+    }
+    return;
+  }
+
+  if (appState !== 'tracking') return;
+
+  statusEl.textContent = 'Tracking active';
+  yawEl.textContent = yaw.toFixed(1);
+  pitchEl.textContent = pitch.toFixed(1);
+  earValEl.textContent = avgEAR.toFixed(3);
+
+  const closedThresholdEAR = baselineEAR * EAR_CLOSED_RATIO;
+  const eyesClosed = avgEAR < closedThresholdEAR;
+  if (eyesClosed) {
+    if (eyesClosedStart === null) eyesClosedStart = now;
+  } else {
+    eyesClosedStart = null;
+  }
+  const closedDuration = eyesClosedStart ? (now - eyesClosedStart) / 1000 : 0;
+
+  const pitchDeviation = Math.abs(pitch - baselinePitch);
+  const yawRelative = yaw - baselineYaw;
+  const yawTurned = yawRelative < YAW_LOWER_OFFSET_DEG || yawRelative > YAW_UPPER_OFFSET_DEG;
+  const pitchTurned = pitchDeviation > PITCH_DEVIATION_THRESHOLD_DEG;
+
+  if (yawTurned) {
+    if (yawTurnedStart === null) yawTurnedStart = now;
+  } else {
+    yawTurnedStart = null;
+  }
+  if (pitchTurned) {
+    if (pitchTurnedStart === null) pitchTurnedStart = now;
+  } else {
+    pitchTurnedStart = null;
+  }
+
+  const yawDuration = yawTurnedStart ? (now - yawTurnedStart) / 1000 : 0;
+  const pitchDuration = pitchTurnedStart ? (now - pitchTurnedStart) / 1000 : 0;
+
+  const eyesTriggered = closedDuration >= EYE_CLOSED_THRESHOLD;
+  const yawTriggered = yawDuration >= YAW_TURNED_THRESHOLD;
+  const pitchTriggered = pitchDuration >= PITCH_TURNED_THRESHOLD;
+  const shouldAlarm = eyesTriggered || yawTriggered || pitchTriggered;
+
+  // Log a warning once per triggered event (on the rising edge into alarm)
+  if (shouldAlarm && !alarmPlaying) {
+    logWarning(eyesTriggered ? 'drowsy' : 'distracted');
+  }
+
+  setAlarm(shouldAlarm);
+}
+
+// ============ Init ============
+applyTheme(currentTheme);
+
+const faceMesh = new FaceMesh({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+});
+faceMesh.setOptions({
+  maxNumFaces: 1,
+  refineLandmarks: true,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5
+});
+faceMesh.onResults(onResults);
+
+const camera = new Camera(videoEl, {
+  onFrame: async () => { await faceMesh.send({ image: videoEl }); },
+  width: 480,
+  height: 360
+});
+camera.start().catch((err) => {
+  statusEl.textContent = 'Camera error: ' + err.message;
+});
+</script>
+
+</body>
+</html>
